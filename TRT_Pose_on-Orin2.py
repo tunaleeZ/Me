@@ -176,12 +176,8 @@ try:
         cTime = time.time()
         fps_show = 1.0 / max(1e-6, cTime - pTime)
         pTime = cTime
-        cv2.putText(vis, f"FPS: {fps_show:.1f}", (10, 25),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2, cv2.LINE_AA)
+        cv2.putText(vis, f"FPS: {fps_show:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2, cv2.LINE_AA)
 
-        cv2.imshow("trt_pose: full skeleton + wrists XYZ", vis)
-        if (cv2.waitKey(1) & 0xFF) in (27, ord('q')):
-            break
         cv2.putText(vis, f"FPS (Stream): {fps_show:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2, cv2.LINE_AA)
         cv2.putText(vis, f"FPS (Model): {model_fps:.1f}", (10, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2, cv2.LINE_AA)
 
@@ -219,4 +215,5 @@ finally:
     except:
         pass
     pipe.stop()
+
     cv2.destroyAllWindows()
