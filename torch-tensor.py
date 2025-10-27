@@ -13,7 +13,7 @@ import numpy as np
 import torch_tensorrt
 import torch_tensorrt.dynamo as ttrt
 
-# ============ CAMERA CONFIG ============
+#camera confic
 pipe = rs.pipeline()
 cfg  = rs.config()
 cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
@@ -24,7 +24,7 @@ depth_sensor = profile.get_device().first_depth_sensor()
 DEPTH_SCALE = float(depth_sensor.get_depth_scale())
 align = rs.align(rs.stream.color)
 
-# ============ WRITE VIDEO ============
+#ghi vid
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
 fps = 30.0
 size = (640, 480)
@@ -32,10 +32,11 @@ out_rgb   = cv2.VideoWriter('rgb_output.avi',   fourcc, fps, size)
 out_depth = cv2.VideoWriter('depth_output.avi', fourcc, fps, size)
 enable_both = False
 
-# ============ LOAD MODEL ============
+#load model
 with open('human_pose.json', 'r') as f:
     human_pose = json.load(f)
 
+#keypoints -> index
 topology = trt_pose.coco.coco_category_to_topology(human_pose)
 keypoints_list = human_pose['keypoints']
 KP_LEFT_WRIST  = keypoints_list.index('left_wrist')
@@ -51,7 +52,7 @@ WIDTH = 224
 HEIGHT = 224
 data = torch.zeros((1, 3, HEIGHT, WIDTH)).cuda()
 
-# ============ TORCH-TENSORRT DYNAMO ============
+#TORCH-TENSORRT DYNAMO 
 try:
     model_ttrt = ttrt.compile(
         model.eval().cuda(),
@@ -63,7 +64,7 @@ except Exception as e:
     print("⚠️ Torch-TensorRT compile FP32 thất bại, dùng model PyTorch thuần. Lý do:", e)
     model_ttrt = model  # fallback
 
-# ============ PREPROCESS ============
+#preprocess
 mean = torch.Tensor([0.485, 0.456, 0.406]).cuda()
 std = torch.Tensor([0.229, 0.224, 0.225]).cuda()
 device = torch.device('cuda')
@@ -81,7 +82,7 @@ def deproject_xyz_from_pixel(color_frame, x, y, depth_m):
     X, Y, Z = rs.rs2_deproject_pixel_to_point(intr, [float(x), float(y)], float(depth_m))
     return X, Y, Z
 
-# ============ MODEL FPS ============
+#model fps
 t0 = time.time()
 torch.cuda.current_stream().synchronize()
 for i in range(50):
@@ -93,7 +94,7 @@ model_fps = 50.0 / (t1 - t0)
 parse_objects = ParseObjects(topology)
 draw_objects = DrawObjects(topology)
 
-# ============ MAIN LOOP ============
+
 try:
     pTime = time.time()
     while True:
