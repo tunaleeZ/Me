@@ -49,7 +49,6 @@ KP_LEFT_WRIST  = keypoints_list.index('left_wrist')
 KP_RIGHT_WRIST = keypoints_list.index('right_wrist')
 
 
-
 #load trt_model
 num_parts = len(human_pose['keypoints'])
 num_links = len(human_pose['skeleton'])
@@ -227,3 +226,4 @@ finally:
     pipe.stop()
 
     cv2.destroyAllWindows()
+
