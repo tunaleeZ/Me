@@ -65,6 +65,16 @@ WIDTH = 224
 HEIGHT = 224
 data = torch.zeros((1, 3, HEIGHT, WIDTH)).cuda()
 
+#test keypoints
+print('num_parts:', len(human_pose['keypoints']))   #18
+print('num_links:', len(human_pose['skeleton']))    #21
+
+# test forward by PyTorch
+with torch.no_grad():
+    y_cmap, y_paf = model(data)
+print('cmap:', y_cmap.shape)  # (1, 18, 56, 56) 
+print('paf :', y_paf.shape)   # (1, 42, 56, 56) 
+
 #optimize model
 model_trt = torch2trt.torch2trt(model, [data], fp16_mode=True, max_workspace_size=1<<25)
 OPTIMIZED_MODEL = 'resnet18_baseline_att_224x224_A_epoch_249_trt.pth'
@@ -215,4 +225,5 @@ finally:
     except:
         pass
     pipe.stop()
+
     cv2.destroyAllWindows()
