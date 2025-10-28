@@ -151,8 +151,9 @@ try:
         cv2.putText(vis, f"FPS (Model): {model_fps:.1f}", (10, 55),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2, cv2.LINE_AA)
 
+        #raw -> 8bit -> colormap
         depth_raw = np.asanyarray(depth_frame.get_data()).astype(np.uint16)
-        MAX_DEPTH_M = 4.0
+        MAX_DEPTH_M = 4.0 #scale 4m
         max_ticks = MAX_DEPTH_M / DEPTH_SCALE
         depth_8u = cv2.convertScaleAbs(depth_raw, alpha=255.0 / max_ticks)
         depth_color = cv2.applyColorMap(depth_8u, cv2.COLORMAP_JET)
