@@ -1,0 +1,16 @@
+Các bước cài nhanh (Jetson Orin – JP6 / CUDA 12.6 / TRT 10.3 / Torch 2.8)
+
+bật đúng conda env 
+
+conda activate jetson  
+
+
+cài Torch-TensorRT (và ModelOpt để hết cảnh báo)
+
+pip install --upgrade torch-tensorrt==2.8.0 nvidia-modelopt \
+  --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+
+
+
+
+pip install --upgrade trt-pose pyrealsense2 opencv-python pillow numpy torchvision tqdm
