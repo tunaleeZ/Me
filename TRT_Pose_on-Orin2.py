@@ -48,7 +48,7 @@ keypoints_list = human_pose['keypoints']
 KP_LEFT_WRIST  = keypoints_list.index('left_wrist')
 KP_RIGHT_WRIST = keypoints_list.index('right_wrist')
 
-
+#
 #load trt_model
 num_parts = len(human_pose['keypoints'])
 num_links = len(human_pose['skeleton'])
@@ -58,6 +58,24 @@ model = trt_pose.models.resnet18_baseline_att(num_parts, 2 * num_links).cuda().e
 #load model weight
 MODEL_WEIGHTS = 'resnet18_baseline_att_224x224_A_epoch_249.pth'
 model.load_state_dict(torch.load(MODEL_WEIGHTS))
+#
+
+
+
+# Load model weight
+#MODEL_WEIGHTS = 'resnet18_baseline_att_224x224_A_epoch_249.pth'
+#model.load_state_dict(torch.load(MODEL_WEIGHTS))
+
+#model pytorch goc
+#print("Using PyTorch model (no TensorRT optimization)")
+#model_trt = model  #model goc
+
+
+
+
+
+
+
 
 #set dimension to  optimize  TensorRT
 WIDTH = 224
@@ -226,4 +244,5 @@ finally:
     pipe.stop()
 
     cv2.destroyAllWindows()
+
 
