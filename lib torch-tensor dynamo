@@ -14,3 +14,26 @@ pip install --upgrade torch-tensorrt==2.8.0 nvidia-modelopt \
 
 
 pip install --upgrade trt-pose pyrealsense2 opencv-python pillow numpy torchvision tqdm
+
+
+
+
+python3 -m venv trtpose-venv
+source trtpose-venv/bin/activate
+pip install --upgrade pip setuptools wheel
+🔥 2️⃣ Cài đúng PyTorch build CUDA 12.4 (ổn định trên driver 12.6)
+bash
+Sao chép mã
+pip install torch==2.3.1+cu124 torchvision==0.18.1+cu124 torchaudio==2.3.1+cu124 \
+  --index-url https://download.pytorch.org/whl/cu124
+🧩 3️⃣ Cài các thư viện cần thiết cho TRT Pose
+bash
+Sao chép mã
+pip install onnx onnx-graphsurgeon numpy pillow
+⚙️ 4️⃣ Cài torch2trt (bắt buộc để convert TensorRT)
+bash
+Sao chép mã
+git clone https://github.com/NVIDIA-AI-IOT/torch2trt.git
+cd torch2trt
+python setup.py install
+cd ..
