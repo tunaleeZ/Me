@@ -57,11 +57,11 @@ try:
     model_ttrt = ttrt.compile(
         model.eval().cuda(),
         inputs=[ttrt.Input((1, 3, HEIGHT, WIDTH), dtype=torch.float32)],
-        enabled_precisions={torch.float32},  # FP32 trước
+        enabled_precisions={torch.float32},  # FP32
     )
-    print("✅ Torch-TensorRT compile thành công (FP32).")
+    #Torch-TensorRT complide FP32
 except Exception as e:
-    print("⚠️ Torch-TensorRT compile FP32 thất bại, dùng model PyTorch thuần. Lý do:", e)
+    print("khong dung duoc Torch-TensorRT compile FP32 , dung model PyTorch", e)
     model_ttrt = model  # fallback
 
 #preprocess
