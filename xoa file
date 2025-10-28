@@ -1,0 +1,68 @@
+0) (Khuyến nghị) Xác định các thư mục site-packages cần quét
+
+Chạy để biết các đường dẫn site-packages (venv + user):
+
+python - <<'PY'
+import site, sys
+print("sys.executable:", sys.executable)
+print("site.getsitepackages():", site.getsitepackages())
+print("site.getusersitepackages():", site.getusersitepackages())
+PY
+
+
+Ghi lại các đường dẫn in ra (ví dụ ~/trtpose-venv/lib/python3.10/site-packages, ~/.local/lib/python3.10/site-packages).
+
+1) XÓA CACHE PIP & FILE TẢI DỞ (bao gồm *.part, *.tmp — chỉ hôm nay)
+Xem trước (dry-run)
+echo "---- pip cache today ----"
+find ~/.cache/pip -type f -newermt "$(date +%Y-%m-%d)" -print 2>/dev/null
+
+echo "---- partial downloads today ----"
+find ~ -type f -newermt "$(date +%Y-%m-%d)" \( -name "*.part" -o -name "*.tmp" -o -name "*.whl.part" \) -print
+
+Xóa thật
+pip cache purge
+find ~/.cache/pip -type f -newermt "$(date +%Y-%m-%d)" -delete 2>/dev/null
+find ~ -type f -newermt "$(date +%Y-%m-%d)" \( -name "*.part" -o -name "*.tmp" -o -name "*.whl.part" \) -delete
+
+2) XÓA CÁC GÓI PIP ĐÃ CÀI HÔM NAY (xóa khỏi site-packages)
+
+Cái này loại bỏ luôn thư viện bạn đã cài hôm nay (không chỉ cache). Nếu bạn chỉ muốn xóa “file tải về” mà vẫn giữ thư viện đã cài, thì bỏ qua bước 2.
+
+Xem trước (thay đường dẫn SITE_PKGS_* bằng đường dẫn ở bước 0)
+# ví dụ cho venv
+SITE_PKGS_VENV=~/trtpose-venv/lib/python3.10/site-packages
+find "$SITE_PKGS_VENV" -maxdepth 1 -type d -newermt "$(date +%Y-%m-%d)" -print
+
+# ví dụ cho user site-packages
+SITE_PKGS_USER=~/.local/lib/python3.10/site-packages
+find "$SITE_PKGS_USER" -maxdepth 1 -type d -newermt "$(date +%Y-%m-%d)" -print
+
+Xóa thật (cẩn thận!)
+find "$SITE_PKGS_VENV" -maxdepth 1 -type d -newermt "$(date +%Y-%m-%d)" -exec rm -rf {} +
+find "$SITE_PKGS_USER" -maxdepth 1 -type d -newermt "$(date +%Y-%m-%d)" -exec rm -rf {} +
+
+
+Nếu bạn có nhiều venv, lặp lại lệnh cho từng .../site-packages tương ứng.
+Cách an toàn hơn là trước khi xóa, pip list --path <site-packages> để xem gói nào sẽ bị ảnh hưởng.
+
+3) XÓA CÁC FILE GÓI ĐÃ TẢI HÔM NAY: .whl, .tar.*, .zip, .pth
+Xem trước
+find ~ -type f -newermt "$(date +%Y-%m-%d)" \( -name "*.whl" -o -name "*.tar*" -o -name "*.zip" -o -name "*.pth" \) -print
+
+Xóa thật
+find ~ -type f -newermt "$(date +%Y-%m-%d)" \( -name "*.whl" -o -name "*.tar*" -o -name "*.zip" -o -name "*.pth" \) -delete
+
+4) XÓA REPO GIT VÀ THƯ MỤC BUILD TẠO HÔM NAY (nếu bạn có clone/build)
+# repo clone hôm nay
+find ~ -type d -newermt "$(date +%Y-%m-%d)" -name ".git" -exec dirname {} \; | xargs -r rm -rf
+
+# build/dist/egg-info hôm nay
+find ~ -type d -newermt "$(date +%Y-%m-%d)" \( -name "build" -o -name "dist" -o -name "*.egg-info" \) -exec rm -rf {} +
+
+5) (Tùy chọn) Cache apt hôm nay (KHÔNG gỡ cài đặt)
+sudo find /var/cache/apt/archives -type f -newermt "$(date +%Y-%m-%d)" -print
+sudo find /var/cache/apt/archives -type f -newermt "$(date +%Y-%m-%d)" -delete
+
+6) Kiểm tra dung lượng sau khi dọn
+df -h
