@@ -1,5 +1,4 @@
-# bai1_pose_xyz.py
-# Hiển thị skeleton cơ thể + X,Y,Z thật của 2 cổ tay (không dùng hand_pose)
+
 
 import json, time, os
 import cv2, numpy as np, PIL.Image
