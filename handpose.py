@@ -89,9 +89,6 @@ model_trt_hand.load_state_dict(torch.load(OPTIMIZED_MODEL_HAND))
 model_trt_hand.to(device).eval()
 
 # ------------------ Parse & draw helpers ------------------
-# body
-parse_objects_body = ParseObjects(topology_body, cmap_threshold=0.15, link_threshold=0.15)
-# nếu muốn vẽ full skeleton người thì tạo DrawObjects(topology_body), ở đây mình không vẽ
 
 # hand
 parse_objects_hand = ParseObjects(topology_hand, cmap_threshold=0.15, link_threshold=0.15)
@@ -237,7 +234,6 @@ try:
         text_lines = []
         if hand_wrist_valid:
             text_lines.append(f"Hand (C1): X={hand_X_cm:.1f}cm  Z={hand_Z_cm:.1f}cm")
-            # chấm nhỏ tại vị trí cổ tay từ hand
             cv2.circle(display, (wrist_px_hand, wrist_py_hand), 4, (0,255,255), -1)
 
         base_x = max(10, Wc - 420)
@@ -257,10 +253,10 @@ try:
         depth_8u = cv2.convertScaleAbs(depth_raw, alpha=255.0 / max_ticks)
         depth_color = cv2.applyColorMap(depth_8u, cv2.COLORMAP_JET)
 
-        cv2.imshow("Hand+Body Pose (wrist XYZ)", display)
+        cv2.imshow("Hand_Pose (wrist XYZ)", display)
         cv2.imshow("Depth", depth_color)
 
-        # --------- GHI LOG: chỉ X,Z (cm) như bạn yêu cầu ---------
+        # --------- GHI LOG: X,Z (cm)  ---------
         if recording:
             t_rel = time.time() - record_start_t
             # nếu không valid thì để rỗng
