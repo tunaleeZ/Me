@@ -19,17 +19,17 @@ with open('wrist_trajectory_xyz_cm.csv', 'r') as f:
 
 fig, (axL, axR) = plt.subplots(1, 2, figsize=(10, 5))
 
-# Body trái
+# LEft Body 
 axL.plot(xs_left, zs_left, marker='.')
-axL.set_title('Body trái')
+axL.set_title('LEFT Body')
 axL.set_xlabel('X (cm)')
 axL.set_ylabel('Z (cm)')
 axL.axis('equal')
 axL.grid(True)
 
-# Body phải
+# right phải
 axR.plot(xs_right, zs_right, marker='.')
-axR.set_title('Body phải')
+axR.set_title('RIGHT Body')
 axR.set_xlabel('X (cm)')
 axR.set_ylabel('Z (cm)')
 axR.axis('equal')
