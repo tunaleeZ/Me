@@ -27,11 +27,6 @@ keypoints_list = human_pose['keypoints']
 KP_LEFT_WRIST  = keypoints_list.index('left_wrist')
 KP_RIGHT_WRIST = keypoints_list.index('right_wrist')
 
-with open('preprocess/hand_pose.json', 'r') as f:
-    hand_pose = json.load(f)
-topology_hand = trt_pose.coco.coco_category_to_topology(hand_pose)
-num_parts_hand = len(hand_pose['keypoints'])
-num_links_hand = len(hand_pose['skeleton'])
 
 # ------------------ Model & size config ------------------
 WIDTH, HEIGHT = 224, 224
@@ -39,7 +34,6 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # ------------------ Load body & hand models (TRT or fallback) ------------------
 model = trt_pose.models.resnet18_baseline_att(num_parts, 2*num_links).to(device).eval()
-model_hand = trt_pose.models.resnet18_baseline_att(num_parts_hand, 2*num_links_hand).to(device).eval()
 
 # helper zero tensor for conversion
 data = torch.zeros((1,3,HEIGHT,WIDTH)).to(device)
@@ -66,40 +60,11 @@ model_trt = TRTModule()
 model_trt.load_state_dict(torch.load(OPTIMIZED_MODEL))
 model_trt.to(device).eval()
 
-# HAND MODEL
-OPTIMIZED_MODEL_HAND = 'models/hand_pose_resnet18_att_244_244_trt.pth'
-if not os.path.exists(OPTIMIZED_MODEL_HAND):
-    MODEL_WEIGHTS_HAND = 'models/hand_pose_resnet18_att_244_244.pth'
-    print("Converting hand model to TRT...")
-    model_hand.load_state_dict(torch.load(MODEL_WEIGHTS_HAND, map_location='cpu'))
-    model_hand.to(device).eval()
-    try:
-        model_trt_hand = torch2trt.torch2trt(
-            model_hand, [data],
-            fp16_mode=True,
-            max_workspace_size=1<<25
-        )
-        torch.save(model_trt_hand.state_dict(), OPTIMIZED_MODEL_HAND)
-    except Exception as e:
-        print("torch2trt conversion failed (hand):", e)
-        raise
-
-model_trt_hand = TRTModule()
-model_trt_hand.load_state_dict(torch.load(OPTIMIZED_MODEL_HAND))
-model_trt_hand.to(device).eval()
 
 # ------------------ Parse & draw helpers ------------------
 # body
 parse_objects_body = ParseObjects(topology_body, cmap_threshold=0.15, link_threshold=0.15)
-# nếu muốn vẽ full skeleton người thì tạo DrawObjects(topology_body), ở đây mình không vẽ
-
-# hand
-parse_objects_hand = ParseObjects(topology_hand, cmap_threshold=0.15, link_threshold=0.15)
-draw_objects_hand = DrawObjects(topology_hand)
-
-# Your preprocessdata class instance (should match topology)
-from preprocessdata import preprocessdata
-preprocessdata_hand = preprocessdata(topology_hand, num_parts_hand)
+draw_objects = DrawObjects(topology)
 
 # Normalize tensors
 mean = torch.Tensor([0.485,0.456,0.406]).to(device)
@@ -129,34 +94,33 @@ align = rs.align(rs.stream.color)  # align depth -> color
 depth_sensor = profile.get_device().first_depth_sensor()
 DEPTH_SCALE = float(depth_sensor.get_depth_scale())  # m/LSB
 
-MAX_DEPTH_M = 4.0   # chỉ để hiển thị ảnh depth
+MAX_DEPTH_M = 4.0  
 
-# ------------------ FPS model (đơn giản cho hand) ------------------
+# ------------------ FPS model ------------------
 with torch.no_grad():
     torch.cuda.synchronize()
     t0 = time.time()
     for _ in range(50):
-        _ = model_trt_hand(data)
+        _ = model_trt(data)
     torch.cuda.synchronize()
     model_fps = 50.0 / (time.time() - t0)
 
-# ------------------ Ghi log quỹ đạo cổ tay ------------------
-trajectory = []   # mỗi phần tử: [t_sec, hand_X_cm, hand_Z_cm, bodyLX_cm, bodyLZ_cm, bodyRX_cm, bodyRZ_cm]
+# ------------------ Ghi log  ------------------
+trajectory = []  # [t_sec, bodyLX_cm, bodyLZ_cm, bodyRX_cm, bodyRZ_cm]
 recording = False
 record_start_t = 0.0
 
 def save_trajectory_csv(path='wrist_trajectory_xyz_cm.csv'):
     if not trajectory:
-        print("Không có dữ liệu để lưu.")
+        print("no data to save.")
         return
     with open(path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['t_sec',
-                         'hand_X_cm', 'hand_Z_cm',
                          'bodyL_X_cm', 'bodyL_Z_cm',
                          'bodyR_X_cm', 'bodyR_Z_cm'])
         writer.writerows(trajectory)
-    print(f"Đã lưu {len(trajectory)} mẫu vào {path}")
+    print(f"saved {len(trajectory)} to {path}")
 
 # ------------------ Loop chính ------------------
 try:
@@ -173,53 +137,15 @@ try:
 
         color_full = np.asanyarray(color_frame.get_data())  # 640x480
         Hc, Wc = color_full.shape[:2]
-
-        # Resize cho model (cả body & hand dùng chung 224x224)
+        #resize
         frame = cv2.resize(color_full, (WIDTH, HEIGHT))
-
         data_tensor = preprocess(frame)
 
         # inference under no_grad
         with torch.no_grad():
-            # Cách 1: hand_pose
-            cmap_h, paf_h = model_trt_hand(data_tensor)
-            # Cách 2: body (human_pose)
             cmap_b, paf_b = model_trt(data_tensor)
 
-        # --------- HAND_POSE: only hand skeleton + wrist from hand ---------
-        cmap_cpu_h = cmap_h.detach().cpu()
-        paf_cpu_h  = paf_h.detach().cpu()
-
-        counts_h, objects_h, peaks_h = parse_objects_hand(cmap_cpu_h, paf_cpu_h)
-        joints = preprocessdata_hand.joints_inference(frame, counts_h, objects_h, peaks_h)
-
-        # vẽ skeleton bàn tay trên frame 224x224
-        draw_objects_hand(frame, counts_h, objects_h, peaks_h)
-
-        # scale hệ số 224 -> 640
-        sx = Wc / float(WIDTH)
-        sy = Hc / float(HEIGHT)
-
-        hand_wrist_valid = False
-        hand_X_cm = hand_Z_cm = 0.0
-        wrist_px_hand = wrist_py_hand = 0
-
-        # joints[0] coi như cổ tay/gốc bàn tay
-        if len(joints) > 0 and joints[0] != [0, 0]:
-            jx, jy = joints[0]
-            wrist_px_hand = int(jx * sx)
-            wrist_py_hand = int(jy * sy)
-
-            # clamp vào frame
-            wrist_px_hand = max(0, min(Wc-1, wrist_px_hand))
-            wrist_py_hand = max(0, min(Hc-1, wrist_py_hand))
-
-            depth_m = depth_frame.get_distance(wrist_px_hand, wrist_py_hand)
-            if depth_m > 0 and not np.isnan(depth_m):
-                Xh, Yh, Zh = deproject_xyz_from_pixel(depth_frame, wrist_px_hand, wrist_py_hand, depth_m)
-                hand_X_cm = Xh * 100.0   # cm
-                hand_Z_cm = Zh * 100.0   # cm
-                hand_wrist_valid = True
+      
 
         # --------- BODY (HUMAN_POSE): 2 cổ tay trái/phải ---------
         bodyL_valid = False
@@ -230,9 +156,10 @@ try:
         cmap_cpu_b = cmap_b.detach().cpu()
         paf_cpu_b  = paf_b.detach().cpu()
         counts_b, objects_b, peaks_b = parse_objects_body(cmap_cpu_b, paf_cpu_b)
+        draw_objects(frame, counts_b, objects_b, peaks_b)
 
         if int(counts_b[0]) > 0:
-            pid = 0  # lấy người đầu tiên
+            pid = 0  # first human
 
             for name, kidx in [('L', KP_LEFT_WRIST), ('R', KP_RIGHT_WRIST)]:
                 peak_id = int(objects_b[0, pid, kidx])
@@ -265,9 +192,8 @@ try:
                     bodyR_X_cm = Xb_cm
                     bodyR_Z_cm = Zb_cm
 
-        # --------- Hiển thị ----------
-
-        # phóng to frame 224x224 (đã vẽ skeleton tay) lên 640x480
+      
+        #  frame 224x224 to 640x480
         display = cv2.resize(frame, (Wc, Hc))
 
         # FPS
@@ -282,11 +208,6 @@ try:
 
         # text toạ độ ở góc PHẢI TRÊN
         text_lines = []
-        if hand_wrist_valid:
-            text_lines.append(f"Hand (C1): X={hand_X_cm:.1f}cm  Z={hand_Z_cm:.1f}cm")
-            # chấm nhỏ tại vị trí cổ tay từ hand
-            cv2.circle(display, (wrist_px_hand, wrist_py_hand), 4, (0,255,255), -1)
-
         if bodyL_valid:
             text_lines.append(f"Body L (C2): X={bodyL_X_cm:.1f}cm  Z={bodyL_Z_cm:.1f}cm")
         if bodyR_valid:
@@ -298,12 +219,12 @@ try:
             cv2.putText(display, line, (base_x, y),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0,255,0), 2, cv2.LINE_AA)
 
-        # trạng thái ghi log
+        # tt ghi log
         if recording:
             cv2.putText(display, "REC", (10, 85),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2, cv2.LINE_AA)
 
-        # Depth visualization (chỉ để nhìn)
+        # Depth visualization
         depth_raw = np.asanyarray(depth_frame.get_data()).astype(np.uint16)
         max_ticks = MAX_DEPTH_M / DEPTH_SCALE
         depth_8u = cv2.convertScaleAbs(depth_raw, alpha=255.0 / max_ticks)
@@ -312,17 +233,14 @@ try:
         cv2.imshow("Hand+Body Pose (wrist XYZ)", display)
         cv2.imshow("Depth", depth_color)
 
-        # --------- GHI LOG: chỉ X,Z (cm) như bạn yêu cầu ---------
+        # --------- GHI LOG: X,Z (cm)  ---------
         if recording:
             t_rel = time.time() - record_start_t
-            # nếu không valid thì để rỗng
-            hX = f"{hand_X_cm:.3f}" if hand_wrist_valid else ""
-            hZ = f"{hand_Z_cm:.3f}" if hand_wrist_valid else ""
             lX = f"{bodyL_X_cm:.3f}" if bodyL_valid else ""
             lZ = f"{bodyL_Z_cm:.3f}" if bodyL_valid else ""
             rX = f"{bodyR_X_cm:.3f}" if bodyR_valid else ""
             rZ = f"{bodyR_Z_cm:.3f}" if bodyR_valid else ""
-            trajectory.append([f"{t_rel:.3f}", hX, hZ, lX, lZ, rX, rZ])
+            trajectory.append([f"{t_rel:.3f}", lX, lZ, rX, rZ])
 
         key = cv2.waitKey(1) & 0xFF
         if key == 27 or key == ord('q'):
@@ -335,7 +253,7 @@ try:
                 record_start_t = time.time()
                 print(">>> START recording wrist trajectory")
             else:
-                print(">>> STOP recording (nhấn 's' để lưu CSV)")
+                print(">>> STOP recording (press 's' to save CSV)")
         elif key == ord('s'):
             save_trajectory_csv()
 
