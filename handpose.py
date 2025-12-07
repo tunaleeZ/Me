@@ -148,7 +148,7 @@ def save_trajectory_csv(path='wrist_trajectory_xyz_cm.csv'):
         return
     with open(path, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['t_sec', 'hand_X_cm', 'hand_Z_cm'])
+        writer.writerow(['t_sec', 'hand_X_cm', 'hand_Y_cm', 'hand_Z_cm'])
         writer.writerows(trajectory)
     print(f"saved {len(trajectory)} to {path}")
 
@@ -212,6 +212,7 @@ try:
             if depth_m > 0 and not np.isnan(depth_m):
                 Xh, Yh, Zh = deproject_xyz_from_pixel(depth_frame, wrist_px_hand, wrist_py_hand, depth_m)
                 hand_X_cm = Xh * 100.0   # cm
+                hand_Y_cm = Yh * 100.0   # cm
                 hand_Z_cm = Zh * 100.0   # cm
                 hand_wrist_valid = True
 
@@ -261,8 +262,9 @@ try:
             t_rel = time.time() - record_start_t
             # nếu không valid thì để rỗng
             hX = f"{hand_X_cm:.3f}" if hand_wrist_valid else ""
+            hY = f"{hand_Y_cm:.3f}" if hand_wrist_valid else ""
             hZ = f"{hand_Z_cm:.3f}" if hand_wrist_valid else ""
-            trajectory.append([f"{t_rel:.3f}", hX, hZ])
+            trajectory.append([f"{t_rel:.3f}", hX, hY, hZ])
 
         key = cv2.waitKey(1) & 0xFF
         if key == 27 or key == ord('q'):
